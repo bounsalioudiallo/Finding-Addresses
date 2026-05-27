@@ -7,6 +7,7 @@ A mobile-first, offline web tool for NYC delivery riders navigating Manhattan by
 - Decodes avenue addresses into the nearest numbered cross street using the Manhattan address formula.
 - Estimates avenue blocks for numbered street addresses.
 - Shows Manhattan grid direction from the phone compass with the 29 degree grid offset applied.
+- Reads native Android GPS when installed as the Android app, with browser geolocation as a web fallback.
 - Includes quick one-way street and avenue rules for riders.
 - Runs as one self-contained HTML file with no external dependencies.
 
@@ -56,3 +57,21 @@ Example: `435 Lexington Ave`
 ## Notes
 
 The compass uses `DeviceOrientationEvent`. iOS requires a tap before asking for sensor permission, so the app starts compass tracking from the Start Compass button.
+
+## Android App
+
+The repository now includes a native Android wrapper in `app/`. It loads the same web UI from `app/src/main/assets/www/index.html`, then exposes native Android GPS through a JavaScript bridge named `NativeGps`.
+
+Native Android permissions used:
+
+- `ACCESS_FINE_LOCATION`
+- `ACCESS_COARSE_LOCATION`
+
+To build it on a MacBook:
+
+1. Install Android Studio.
+2. Open this repository folder in Android Studio.
+3. Let Android Studio install/sync the Android SDK and Gradle plugin.
+4. Run the `app` configuration on an Android phone or emulator.
+
+The native shell uses Android `LocationManager`, so GPS does not depend on browser geolocation when running as the installed Android app.
