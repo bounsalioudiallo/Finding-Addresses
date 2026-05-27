@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121826">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Address Decoder">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Manhattan Address Decoder</title>
+  <style>
+    :root {
+      --bg: #f6f2e8;
+      --surface: #ffffff;
+      --surface-strong: #121826;
+      --text: #161b23;
+      --muted: #626b77;
+      --line: #d8d1c3;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --gold: #d39b2f;
+      --danger: #b42318;
+      --ok: #247a44;
+      --shadow: 0 18px 45px rgba(18, 24, 38, 0.12);
+      color-scheme: light;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      min-height: 100%;
+      margin: 0;
+      color: var(--text);
+      background:
+        linear-gradient(135deg, rgba(15, 118, 110, 0.08), transparent 38%),
+        linear-gradient(315deg, rgba(211, 155, 47, 0.12), transparent 34%),
+        var(--bg);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      width: min(720px, 100%);
+      margin: 0 auto;
+      padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 6px 0 18px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 2px;
+    }
+
+    .brand strong {
+      font-size: clamp(1.45rem, 8vw, 2.6rem);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 0.96rem;
+      line-height: 1.35;
+    }
+
+    .offline-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid rgba(18, 24, 38, 0.12);
+      border-radius: 999px;
+      padding: 9px 11px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--accent-strong);
+      font-size: 0.83rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .offline-pill svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(18, 24, 38, 0.1);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 15px 0;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0;
+      font-size: 1.02rem;
+      line-height: 1.2;
+    }
+
+    .panel-title svg {
+      width: 20px;
+      height: 20px;
+      color: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .panel-body {
+      padding: 15px;
+    }
+
+    .compass-wrap {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) minmax(130px, 0.75fr);
+      gap: 16px;
+      align-items: center;
+    }
+
+    .dial {
+      position: relative;
+      width: min(66vw, 250px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, #ffffff 0 45%, transparent 46%),
+        conic-gradient(from -29deg, #0f766e 0 90deg, #e5e0d5 90deg 180deg, #d39b2f 180deg 270deg, #e5e0d5 270deg 360deg);
+      border: 10px solid #121826;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55), 0 14px 28px rgba(18, 24, 38, 0.18);
+    }
+
+    .dial::before,
+    .dial::after {
+      content: "";
+      position: absolute;
+      inset: 11%;
+      border-radius: 50%;
+      border: 1px dashed rgba(18, 24, 38, 0.18);
+    }
+
+    .needle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 14px;
+      height: 42%;
+      border-radius: 999px 999px 3px 3px;
+      background: var(--danger);
+      transform: translate(-50%, -100%) rotate(0deg);
+      transform-origin: 50% 100%;
+      box-shadow: 0 5px 12px rgba(180, 35, 24, 0.28);
+      transition: transform 160ms ease-out;
+      z-index: 2;
+    }
+
+    .needle::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -18px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-strong);
+      box-shadow: inset 0 0 0 7px #fff;
+    }
+
+    .dial-label {
+      position: absolute;
+      color: var(--surface-strong);
+      font-size: 0.74rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+
+    .label-up { top: 8px; left: 50%; transform: translateX(-50%); }
+    .label-down { bottom: 8px; left: 50%; transform: translateX(-50%); }
+    .label-east { right: 11px; top: 50%; transform: translateY(-50%); }
+    .label-west { left: 11px; top: 50%; transform: translateY(-50%); }
+
+    .readout {
+      display: grid;
+      gap: 10px;
+    }
+
+    .direction {
+      font-size: clamp(1.65rem, 9vw, 3rem);
+      font-weight: 900;
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .degrees {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .status {
+      min-height: 42px;
+      color: var(--muted);
+      line-height: 1.35;
+      font-size: 0.94rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 46px;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 15px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .button svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .button.secondary {
+      background: #e7e0d2;
+      color: var(--surface-strong);
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: var(--surface-strong);
+      font-size: 0.86rem;
+      font-weight: 800;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
+    }
+
+    .mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 4px;
+      background: #e7e0d2;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      border: 0;
+      border-radius: 6px;
+      padding: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .tab[aria-selected="true"] {
+      background: #fff;
+      color: var(--surface-strong);
+      box-shadow: 0 2px 10px rgba(18, 24, 38, 0.08);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .result {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 8px;
+      background: #101722;
+      color: #fff;
+    }
+
+    .result.empty {
+      display: none;
+    }
+
+    .result small {
+      display: block;
+      margin-bottom: 5px;
+      color: #bcc5d2;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .result strong {
+      display: block;
+      font-size: clamp(1.55rem, 8vw, 2.35rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .result p {
+      margin: 10px 0 0;
+      color: #d7dde7;
+      line-height: 1.45;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .fact {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px;
+      background: rgba(255,255,255,0.7);
+    }
+
+    .fact b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--surface-strong);
+    }
+
+    .fact span {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .rules-list {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .rules-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      line-height: 1.35;
+    }
+
+    .rules-list li:last-child {
+      border-bottom: 0;
+    }
+
+    .tag {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 3px 9px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-strong);
+      font-size: 0.78rem;
+      font-weight: 900;
+    }
+
+    .install {
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.94rem;
+    }
+
+    .install strong {
+      color: var(--surface-strong);
+    }
+
+    @media (min-width: 620px) {
+      .form-grid.two {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .app {
+        padding-top: 30px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .offline-pill {
+        padding: 8px;
+      }
+
+      .offline-pill span {
+        display: none;
+      }
+
+      .compass-wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .readout {
+        text-align: center;
+      }
+
+      .actions .button {
+        flex: 1 1 145px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <strong>Manhattan Decoder</strong>
+        <span>Address logic and compass guidance for delivery riders.</span>
+      </div>
+      <div class="offline-pill" title="Works after the file is saved on your phone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path>
+        </svg>
+        <span>Offline</span>
+      </div>
+    </header>
+
+    <section class="panel" aria-labelledby="compass-title">
+      <div class="panel-header">
+        <h1 class="panel-title" id="compass-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"></path>
+          </svg>
+          Live Grid Compass
+        </h1>
+      </div>
+      <div class="panel-body">
+        <div class="compass-wrap">
+          <div class="dial" aria-hidden="true">
+            <span class="dial-label label-up">UP</span>
+            <span class="dial-label label-east">E</span>
+            <span class="dial-label label-down">DOWN</span>
+            <span class="dial-label label-west">W</span>
+            <div class="needle" id="needle"></div>
+          </div>
+          <div class="readout">
+            <div class="direction" id="direction">Ready</div>
+            <div class="degrees" id="degrees">Manhattan grid offset: 29 degrees</div>
+            <div class="status" id="compassStatus">Start compass to read your phone sensor. Street numbers rise when you head uptown.</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="button" id="startCompass" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path>
+            </svg>
+            Start Compass
+          </button>
+          <button class="button secondary" id="simulateCompass" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path>
+            </svg>
+            Demo Spin
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="decoder-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="decoder-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path><path d="M7 3v18"></path><path d="M17 3v18"></path>
+          </svg>
+          Decode Address
+        </h2>
+      </div>
+      <div class="panel-body">
+        <div class="mode-tabs" role="tablist" aria-label="Address type">
+          <button class="tab" id="avenueTab" type="button" role="tab" aria-selected="true" aria-controls="avenueForm">Avenue</button>
+          <button class="tab" id="streetTab" type="button" role="tab" aria-selected="false" aria-controls="streetForm">Street</button>
+        </div>
+
+        <form id="avenueForm">
+          <div class="form-grid two">
+            <label>
+              Building number
+              <input id="avenueNumber" inputmode="numeric" pattern="[0-9]*" placeholder="435" autocomplete="off">
+            </label>
+            <label>
+              Avenue
+              <select id="avenueName">
+                <option value="1st Ave">1st Ave</option>
+                <option value="2nd Ave">2nd Ave</option>
+                <option value="3rd Ave">3rd Ave</option>
+                <option value="Lexington Ave" selected>Lexington Ave</option>
+                <option value="Park Ave">Park Ave</option>
+                <option value="Madison Ave">Madison Ave</option>
+                <option value="5th Ave">5th Ave</option>
+                <option value="6th Ave">6th Ave</option>
+                <option value="7th Ave">7th Ave</option>
+                <option value="8th Ave">8th Ave</option>
+                <option value="9th Ave">9th Ave</option>
+                <option value="10th Ave">10th Ave</option>
+                <option value="Amsterdam Ave">Amsterdam Ave</option>
+                <option value="Columbus Ave">Columbus Ave</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="button" type="submit">Decode Address</button>
+          </div>
+        </form>
+
+        <form id="streetForm" class="hidden">
+          <div class="form-grid two">
+            <label>
+              Building number
+              <input id="streetBuilding" inputmode="numeric" pattern="[0-9]*" placeholder="135" autocomplete="off">
+            </label>
+            <label>
+              Street number
+              <input id="streetNumber" inputmode="numeric" pattern="[0-9]*" placeholder="50" autocomplete="off">
+            </label>
+          </div>
+          <div class="actions">
+            <button class="button" type="submit">Find Avenue Block</button>
+          </div>
+        </form>
+
+        <div class="result empty" id="result" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="rules-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="rules-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M4 19V5"></path><path d="M20 19V5"></path><path d="M8 8h8"></path><path d="m13 5 3 3-3 3"></path><path d="M16 16H8"></path><path d="m11 13-3 3 3 3"></path>
+          </svg>
+          Grid Rules
+        </h2>
+      </div>
+      <div class="panel-body">
+        <div class="quick-grid">
+          <div class="fact">
+            <b>Uptown</b>
+            <span>North. Street numbers increase.</span>
+          </div>
+          <div class="fact">
+            <b>Downtown</b>
+            <span>South. Street numbers decrease.</span>
+          </div>
+          <div class="fact">
+            <b>Even streets</b>
+            <span>Usually flow east.</span>
+          </div>
+          <div class="fact">
+            <b>Odd streets</b>
+            <span>Usually flow west.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="oneway-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="oneway-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 12h18"></path><path d="m14 5 7 7-7 7"></path>
+          </svg>
+          One-Way Memory
+        </h2>
+      </div>
+      <div class="panel-body">
+        <ul class="rules-list">
+          <li><span>1st, 3rd, 6th, 8th, 10th Ave</span><span class="tag">Uptown</span></li>
+          <li><span>2nd, Madison, 5th, 7th, 9th Ave</span><span class="tag">Downtown</span></li>
+          <li><span>Park Ave and Broadway</span><span class="tag">Two-way</span></li>
+          <li><span>14th, 23rd, 34th, 42nd, 57th, 72nd, 79th, 86th, 96th</span><span class="tag">Two-way</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="install-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="install-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect width="14" height="20" x="5" y="2" rx="2"></rect><path d="M12 18h.01"></path>
+          </svg>
+          Phone Install
+        </h2>
+      </div>
+      <div class="panel-body install">
+        <p><strong>iPhone:</strong> open this file in Safari, tap Share, then Add to Home Screen.</p>
+        <p><strong>Android:</strong> open this file in Chrome, tap the three-dot menu, then Add to Home Screen.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const AVENUE_KEYS = {
+      "1st Ave": 3,
+      "2nd Ave": 3,
+      "3rd Ave": 10,
+      "Lexington Ave": 22,
+      "Park Ave": 35,
+      "Madison Ave": 26,
+      "5th Ave": 13,
+      "6th Ave": -12,
+      "7th Ave": 12,
+      "8th Ave": 10,
+      "9th Ave": 13,
+      "10th Ave": 14,
+      "Amsterdam Ave": 60,
+      "Columbus Ave": 60
+    };
+
+    const AVENUE_FLOW = {
+      "1st Ave": "uptown",
+      "2nd Ave": "downtown",
+      "3rd Ave": "uptown",
+      "Lexington Ave": "mostly downtown",
+      "Park Ave": "two-way",
+      "Madison Ave": "downtown",
+      "5th Ave": "downtown",
+      "6th Ave": "uptown",
+      "7th Ave": "downtown",
+      "8th Ave": "uptown",
+      "9th Ave": "downtown",
+      "10th Ave": "uptown",
+      "Amsterdam Ave": "uptown",
+      "Columbus Ave": "downtown"
+    };
+
+    const TWO_WAY_STREETS = new Set([14, 23, 34, 42, 57, 72, 79, 86, 96]);
+    const GRID_OFFSET = 29;
+    let demoTimer = null;
+
+    const $ = (id) => document.getElementById(id);
+    const result = $("result");
+    const needle = $("needle");
+    const direction = $("direction");
+    const degrees = $("degrees");
+    const compassStatus = $("compassStatus");
+
+    function cleanNumber(value) {
+      const number = Number.parseInt(String(value).replace(/\D/g, ""), 10);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function ordinal(number) {
+      const suffixes = ["th", "st", "nd", "rd"];
+      const mod100 = number % 100;
+      return number + (suffixes[(mod100 - 20) % 10] || suffixes[mod100] || suffixes[0]);
+    }
+
+    function showResult(label, headline, details) {
+      result.classList.remove("empty");
+      result.innerHTML = `<small>${label}</small><strong>${headline}</strong><p>${details}</p>`;
+    }
+
+    function showError(message) {
+      result.classList.remove("empty");
+      result.innerHTML = `<small>Check address</small><strong>Not enough info</strong><p>${message}</p>`;
+    }
+
+    function decodeAvenue(event) {
+      event.preventDefault();
+      const building = cleanNumber($("avenueNumber").value);
+      const avenue = $("avenueName").value;
+      if (!building) {
+        showError("Enter a building number, like 435 Lexington Ave.");
+        return;
+      }
+
+      const dropped = Math.floor(building / 10);
+      const half = dropped / 2;
+      const crossStreet = Math.round(half) + AVENUE_KEYS[avenue];
+      const zone = crossStreet < 14 ? "Lower Manhattan grid edge" : crossStreet <= 59 ? "Midtown" : "Upper Manhattan";
+      const flow = AVENUE_FLOW[avenue] || "check signage";
+      const streetRule = TWO_WAY_STREETS.has(crossStreet)
+        ? `${ordinal(crossStreet)} Street is a major two-way street.`
+        : `${ordinal(crossStreet)} Street usually flows ${crossStreet % 2 === 0 ? "east" : "west"}.`;
+
+      showResult(
+        "Nearest cross street",
+        `${ordinal(crossStreet)} Street`,
+        `${building} ${avenue}: drop last digit (${dropped}), divide by two (${half.toFixed(1)}), then add ${AVENUE_KEYS[avenue]}. Zone: ${zone}. ${avenue} is ${flow}. ${streetRule}`
+      );
+    }
+
+    function decodeStreet(event) {
+      event.preventDefault();
+      const building = cleanNumber($("streetBuilding").value);
+      const street = cleanNumber($("streetNumber").value);
+      if (!building || !street) {
+        showError("Enter both the building number and street number, like 135 W 50th St.");
+        return;
+      }
+
+      const block = Math.floor(building / 100);
+      const ranges = [
+        "between 5th and 6th Ave",
+        "between 6th and 7th Ave",
+        "between 7th and 8th Ave",
+        "between 8th and 9th Ave",
+        "between 9th and 10th Ave",
+        "between 10th and 11th Ave",
+        "between 11th and 12th Ave"
+      ];
+      const avenueBlock = ranges[block] || (building < 100 ? "between 5th and 6th Ave" : "west of 12th Ave or outside the quick guide");
+      const flow = TWO_WAY_STREETS.has(street) ? "two-way" : street % 2 === 0 ? "eastbound" : "westbound";
+
+      showResult(
+        "Avenue block",
+        avenueBlock,
+        `${building} on ${ordinal(street)} Street points to the ${block * 100}-${block * 100 + 99} block. ${ordinal(street)} Street is usually ${flow}.`
+      );
+    }
+
+    function setMode(mode) {
+      const isAvenue = mode === "avenue";
+      $("avenueForm").classList.toggle("hidden", !isAvenue);
+      $("streetForm").classList.toggle("hidden", isAvenue);
+      $("avenueTab").setAttribute("aria-selected", String(isAvenue));
+      $("streetTab").setAttribute("aria-selected", String(!isAvenue));
+      result.classList.add("empty");
+    }
+
+    function normalizeDegrees(value) {
+      return ((value % 360) + 360) % 360;
+    }
+
+    function gridDirection(heading) {
+      const gridHeading = normalizeDegrees(heading - GRID_OFFSET);
+      if (gridHeading >= 315 || gridHeading < 45) return ["Uptown", "Street numbers increasing ahead"];
+      if (gridHeading >= 45 && gridHeading < 135) return ["East", "Toward 1st Ave and the East River"];
+      if (gridHeading >= 135 && gridHeading < 225) return ["Downtown", "Street numbers decreasing ahead"];
+      return ["West", "Toward 12th Ave and the Hudson River"];
+    }
+
+    function updateCompass(rawHeading, source) {
+      const heading = normalizeDegrees(rawHeading);
+      const [label, helper] = gridDirection(heading);
+      needle.style.transform = `translate(-50%, -100%) rotate(${heading}deg)`;
+      direction.textContent = label;
+      degrees.textContent = `${Math.round(heading)} degrees true north`;
+      compassStatus.textContent = `${helper}. Reading from ${source}.`;
+    }
+
+    function getHeading(event) {
+      if (typeof event.webkitCompassHeading === "number") {
+        return event.webkitCompassHeading;
+      }
+      if (typeof event.alpha === "number") {
+        return 360 - event.alpha;
+      }
+      return null;
+    }
+
+    function handleOrientation(event) {
+      const heading = getHeading(event);
+      if (heading === null) {
+        compassStatus.textContent = "Compass data is not available from this browser.";
+        return;
+      }
+      stopDemo();
+      updateCompass(heading, "phone compass");
+    }
+
+    async function startCompass() {
+      stopDemo();
+      if (!window.DeviceOrientationEvent) {
+        compassStatus.textContent = "This browser does not expose the phone compass. Try Safari or Chrome on a phone.";
+        return;
+      }
+
+      try {
+        if (typeof DeviceOrientationEvent.requestPermission === "function") {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission !== "granted") {
+            compassStatus.textContent = "Compass permission was not granted. Use Demo Spin or allow motion access in browser settings.";
+            return;
+          }
+        }
+        window.addEventListener("deviceorientation", handleOrientation, true);
+        compassStatus.textContent = "Compass is active. Move your phone in a figure eight if the heading seems stuck.";
+      } catch (error) {
+        compassStatus.textContent = "Compass could not start. On iPhone, open from Safari and allow motion access.";
+      }
+    }
+
+    function stopDemo() {
+      if (demoTimer) {
+        window.clearInterval(demoTimer);
+        demoTimer = null;
+      }
+    }
+
+    function demoCompass() {
+      stopDemo();
+      let heading = 0;
+      updateCompass(heading, "demo");
+      demoTimer = window.setInterval(() => {
+        heading = normalizeDegrees(heading + 18);
+        updateCompass(heading, "demo");
+      }, 360);
+    }
+
+    $("avenueForm").addEventListener("submit", decodeAvenue);
+    $("streetForm").addEventListener("submit", decodeStreet);
+    $("avenueTab").addEventListener("click", () => setMode("avenue"));
+    $("streetTab").addEventListener("click", () => setMode("street"));
+    $("startCompass").addEventListener("click", startCompass);
+    $("simulateCompass").addEventListener("click", demoCompass);
+  </script>
+</body>
+</html>
