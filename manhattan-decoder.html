@@ -368,7 +368,7 @@
 
     .assist-result {
       margin-top: 14px;
-      padding: 16px;
+      padding: 18px;
       border-radius: 8px;
       background: #101722;
       color: #fff;
@@ -397,7 +397,8 @@
     .assist-result p {
       margin: 10px 0 0;
       color: #d7dde7;
-      line-height: 1.45;
+      line-height: 1.5;
+      font-size: 1rem;
     }
 
     .assist-list {
@@ -409,8 +410,8 @@
     }
 
     .assist-list li {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: minmax(92px, 0.45fr) minmax(0, 1fr);
       gap: 12px;
       padding-top: 8px;
       border-top: 1px solid rgba(255,255,255,0.14);
@@ -420,7 +421,7 @@
 
     .assist-list b {
       color: #fff;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
     }
 
     .quick-grid {
@@ -574,6 +575,19 @@
       .gps-strip .actions {
         width: 100%;
       }
+
+      .assist-result {
+        padding: 15px;
+      }
+
+      .assist-result strong {
+        font-size: clamp(2rem, 14vw, 3.25rem);
+      }
+
+      .assist-list li {
+        grid-template-columns: 1fr;
+        gap: 3px;
+      }
     }
   </style>
 </head>
@@ -700,7 +714,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path>
             </svg>
-            Tell Me Where To Go
+            Check Direction
           </button>
         </div>
         <div class="assist-result empty" id="assistResult" role="status" aria-live="polite"></div>
@@ -1290,13 +1304,21 @@
       }
       const [facing] = gridDirection(latestHeading);
       if (facing === move) {
-        return `Good: facing ${facing}`;
+        return `Good: you are facing ${facing}`;
       }
       const opposites = { Uptown: "Downtown", Downtown: "Uptown", East: "West", West: "East" };
       if (opposites[move] === facing) {
-        return `Turn around: facing ${facing}`;
+        return `Turn around: you are facing ${facing}`;
       }
-      return `Facing ${facing}: turn ${move.toLowerCase()}`;
+      return `You are facing ${facing}; turn toward ${move}`;
+    }
+
+    function oneWayCaution(move) {
+      if (move === "Uptown") return "Direction only. For legal avenue flow, uptown avenues include 1st, 3rd, 6th, 8th, and 10th.";
+      if (move === "Downtown") return "Direction only. For legal avenue flow, downtown avenues include 2nd, Madison, 5th, 7th, and 9th.";
+      if (move === "East") return "Direction only. Even-numbered streets usually flow east; check signs before taking a block.";
+      if (move === "West") return "Direction only. Odd-numbered streets usually flow west; check signs before taking a block.";
+      return "Direction only. Check one-way signs before choosing the exact street or avenue.";
     }
 
     async function runRideAssist() {
@@ -1329,10 +1351,10 @@
         const accuracy = typeof latestLocation.accuracy === "number" ? latestLocation.accuracy : null;
         const accuracyText = accuracy === null ? "unknown" : `${Math.round(accuracy)} m`;
         const blocksText = move.blocks < 0.5 ? "less than 1 block" : `about ${Math.round(move.blocks)} block${Math.round(move.blocks) === 1 ? "" : "s"}`;
-        const secondaryText = move.secondaryBlocks < 0.5 ? "little crosstown change" : `then ${move.secondary} about ${Math.round(move.secondaryBlocks)} block${Math.round(move.secondaryBlocks) === 1 ? "" : "s"}`;
+        const secondaryText = move.secondaryBlocks < 0.5 ? "little crosstown change" : `destination also sits ${move.secondary} about ${Math.round(move.secondaryBlocks)} block${Math.round(move.secondaryBlocks) === 1 ? "" : "s"}`;
         const headline = move.move;
-        const details = `${facingAdvice(move.move)}. Go ${move.move.toLowerCase()} first (${blocksText}), ${secondaryText}. ${sideHint(address, geocode.formatted_address)} near arrival.`;
-        showAssist("First move", headline, details, [
+        const details = `${facingAdvice(move.move)}. Destination is ${move.move.toLowerCase()} from you (${blocksText}); ${secondaryText}. ${oneWayCaution(move.move)} ${sideHint(address, geocode.formatted_address)} near arrival.`;
+        showAssist("Destination direction", headline, details, [
           { label: "Destination", value: geocode.formatted_address.replace(", USA", "") },
           { label: "Distance", value: `${Math.round(distance)} m` },
           { label: "GPS accuracy", value: accuracyText },
