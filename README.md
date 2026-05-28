@@ -8,6 +8,7 @@ A mobile-first, offline web tool for NYC delivery riders navigating Manhattan by
 - Estimates avenue blocks for numbered street addresses.
 - Shows Manhattan grid direction from the phone compass with the 29 degree grid offset applied.
 - Reads native Android GPS when installed as the Android app, with browser geolocation as a web fallback.
+- Uses Google Maps geocoding for Ride Assist, turning a delivery address plus GPS plus compass into a first-move instruction.
 - Includes quick one-way street and avenue rules for riders.
 - Runs as one self-contained HTML file with no external dependencies.
 
@@ -57,6 +58,22 @@ Example: `435 Lexington Ave`
 ## Notes
 
 The compass uses `DeviceOrientationEvent`. iOS requires a tap before asking for sensor permission, so the app starts compass tracking from the Start Compass button.
+
+## Ride Assist With Google Maps
+
+Ride Assist needs a Google Maps API key. Enable these APIs in Google Cloud:
+
+- Maps JavaScript API
+- Geocoding API
+
+Restrict the key to your GitHub Pages domain or local testing URL when possible. The app stores the key in browser `localStorage`; the key is not committed to this repository.
+
+Ride Assist uses:
+
+1. Phone GPS for current location.
+2. Phone compass for current facing direction.
+3. Google geocoding for the DoorDash destination address.
+4. Manhattan grid math to say whether to start uptown, downtown, east, or west.
 
 ## Android App
 

@@ -366,6 +366,63 @@
       line-height: 1.45;
     }
 
+    .assist-result {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 8px;
+      background: #101722;
+      color: #fff;
+    }
+
+    .assist-result.empty {
+      display: none;
+    }
+
+    .assist-result small {
+      display: block;
+      margin-bottom: 7px;
+      color: #bcc5d2;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .assist-result strong {
+      display: block;
+      font-size: clamp(1.75rem, 9vw, 2.7rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .assist-result p {
+      margin: 10px 0 0;
+      color: #d7dde7;
+      line-height: 1.45;
+    }
+
+    .assist-list {
+      display: grid;
+      gap: 8px;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .assist-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.14);
+      color: #d7dde7;
+      line-height: 1.35;
+    }
+
+    .assist-list b {
+      color: #fff;
+      white-space: nowrap;
+    }
+
     .quick-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -626,6 +683,44 @@
       </div>
     </section>
 
+    <section class="panel" aria-labelledby="assist-title">
+      <div class="panel-header">
+        <h2 class="panel-title" id="assist-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 11 22 2l-9 19-2-8-8-2z"></path>
+          </svg>
+          Ride Assist
+        </h2>
+      </div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <label>
+            Google Maps API key
+            <input id="googleApiKey" autocomplete="off" spellcheck="false" placeholder="Paste key once">
+          </label>
+          <label>
+            DoorDash address
+            <input id="assistAddress" autocomplete="street-address" placeholder="435 Lexington Ave, New York, NY">
+          </label>
+        </div>
+        <div class="actions">
+          <button class="button" id="saveApiKey" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path>
+            </svg>
+            Save Key
+          </button>
+          <button class="button" id="rideAssist" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path>
+            </svg>
+            Tell Me Where To Go
+          </button>
+        </div>
+        <div class="assist-result empty" id="assistResult" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
     <section class="panel" aria-labelledby="decoder-title">
       <div class="panel-header">
         <h2 class="panel-title" id="decoder-title">
@@ -806,6 +901,9 @@
     const gpsStatus = $("gpsStatus");
     const gpsSignal = $("gpsSignal");
     let browserGpsWatchId = null;
+    let latestLocation = null;
+    let latestHeading = null;
+    let mapsLoadPromise = null;
 
     function cleanNumber(value) {
       const number = Number.parseInt(String(value).replace(/\D/g, ""), 10);
@@ -906,6 +1004,7 @@
     function updateCompass(rawHeading, source) {
       const heading = normalizeDegrees(rawHeading);
       const [label, helper] = gridDirection(heading);
+      latestHeading = heading;
       needle.style.transform = `translate(-50%, -100%) rotate(${heading}deg)`;
       direction.textContent = label;
       degrees.textContent = `${Math.round(heading)} degrees true north`;
@@ -990,6 +1089,7 @@
     }
 
     window.handleNativeLocation = function(data) {
+      latestLocation = data;
       $("gpsLat").textContent = formatCoordinate(data.latitude);
       $("gpsLng").textContent = formatCoordinate(data.longitude);
       $("gpsAccuracy").textContent = formatAccuracy(data.accuracy);
@@ -1048,6 +1148,215 @@
       setGpsStatus("GPS stopped.", false);
     }
 
+    function showAssist(label, headline, details, facts) {
+      const rows = facts.map((fact) => `<li><span>${fact.label}</span><b>${fact.value}</b></li>`).join("");
+      $("assistResult").classList.remove("empty");
+      $("assistResult").innerHTML = `<small>${label}</small><strong>${headline}</strong><p>${details}</p><ul class="assist-list">${rows}</ul>`;
+    }
+
+    function showAssistError(message) {
+      $("assistResult").classList.remove("empty");
+      $("assistResult").innerHTML = `<small>Ride assist</small><strong>Need one more thing</strong><p>${message}</p>`;
+    }
+
+    function saveApiKey() {
+      const key = $("googleApiKey").value.trim();
+      if (!key) {
+        showAssistError("Paste your Google Maps API key first.");
+        return;
+      }
+      localStorage.setItem("googleMapsApiKey", key);
+      $("googleApiKey").value = "";
+      showAssist("API key saved", "Ready", "The key is saved in this browser only. Now start GPS, start compass, enter a DoorDash address, then run Ride Assist.", []);
+    }
+
+    function loadSavedApiKey() {
+      if (localStorage.getItem("googleMapsApiKey")) {
+        $("googleApiKey").placeholder = "Saved in this browser";
+      }
+    }
+
+    function loadGoogleMaps() {
+      const key = localStorage.getItem("googleMapsApiKey") || $("googleApiKey").value.trim();
+      if (!key) {
+        return Promise.reject(new Error("Paste and save your Google Maps API key first."));
+      }
+      if (window.google && window.google.maps && window.google.maps.Geocoder) {
+        return Promise.resolve();
+      }
+      if (mapsLoadPromise) {
+        return mapsLoadPromise;
+      }
+      mapsLoadPromise = new Promise((resolve, reject) => {
+        const callbackName = `initGoogleMaps${Date.now()}`;
+        window[callbackName] = () => {
+          delete window[callbackName];
+          resolve();
+        };
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=${callbackName}`;
+        script.async = true;
+        script.onerror = () => reject(new Error("Google Maps could not load. Check the API key, billing, and Maps JavaScript API access."));
+        document.head.appendChild(script);
+      });
+      return mapsLoadPromise;
+    }
+
+    function geocodeAddress(address) {
+      return new Promise((resolve, reject) => {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address, region: "US" }, (results, status) => {
+          if (status !== "OK" || !results || !results[0]) {
+            reject(new Error(`Google could not find that address (${status}).`));
+            return;
+          }
+          resolve(results[0]);
+        });
+      });
+    }
+
+    function toRadians(value) {
+      return value * Math.PI / 180;
+    }
+
+    function toDegrees(value) {
+      return value * 180 / Math.PI;
+    }
+
+    function distanceMeters(from, to) {
+      const earthRadius = 6371000;
+      const dLat = toRadians(to.lat - from.lat);
+      const dLng = toRadians(to.lng - from.lng);
+      const lat1 = toRadians(from.lat);
+      const lat2 = toRadians(to.lat);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+      return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function bearingDegrees(from, to) {
+      const lat1 = toRadians(from.lat);
+      const lat2 = toRadians(to.lat);
+      const dLng = toRadians(to.lng - from.lng);
+      const y = Math.sin(dLng) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+      return normalizeDegrees(toDegrees(Math.atan2(y, x)));
+    }
+
+    function gridVector(from, to) {
+      const metersPerDegreeLat = 111320;
+      const metersPerDegreeLng = 111320 * Math.cos(toRadians((from.lat + to.lat) / 2));
+      const north = (to.lat - from.lat) * metersPerDegreeLat;
+      const east = (to.lng - from.lng) * metersPerDegreeLng;
+      const gridNorth = toRadians(GRID_OFFSET);
+      const uptown = north * Math.cos(gridNorth) + east * Math.sin(gridNorth);
+      const crosstownEast = -north * Math.sin(gridNorth) + east * Math.cos(gridNorth);
+      return { uptown, crosstownEast };
+    }
+
+    function primaryMove(vector) {
+      const streetBlocks = vector.uptown / 80;
+      const avenueBlocks = vector.crosstownEast / 280;
+      if (Math.abs(streetBlocks) >= Math.abs(avenueBlocks)) {
+        return {
+          move: vector.uptown >= 0 ? "Uptown" : "Downtown",
+          blocks: Math.abs(streetBlocks),
+          secondary: vector.crosstownEast >= 0 ? "east" : "west",
+          secondaryBlocks: Math.abs(avenueBlocks)
+        };
+      }
+      return {
+        move: vector.crosstownEast >= 0 ? "East" : "West",
+        blocks: Math.abs(avenueBlocks),
+        secondary: vector.uptown >= 0 ? "uptown" : "downtown",
+        secondaryBlocks: Math.abs(streetBlocks)
+      };
+    }
+
+    function parseAddressNumber(address) {
+      const match = String(address).trim().match(/^(\d+)/);
+      return match ? Number.parseInt(match[1], 10) : null;
+    }
+
+    function destinationRoadType(address, formatted) {
+      const value = `${address} ${formatted}`.toLowerCase();
+      if (/\b(ave|avenue|broadway|park|lexington|madison|amsterdam|columbus)\b/.test(value)) return "avenue";
+      if (/\b(st|street)\b/.test(value)) return "street";
+      return "unknown";
+    }
+
+    function sideHint(address, formatted) {
+      const number = parseAddressNumber(address);
+      if (!number) return "Building side unknown";
+      const roadType = destinationRoadType(address, formatted);
+      const isOdd = number % 2 === 1;
+      if (roadType === "street") {
+        return isOdd ? "Odd address: usually north side" : "Even address: usually south side";
+      }
+      if (roadType === "avenue") {
+        return isOdd ? "Odd address: usually west side" : "Even address: usually east side";
+      }
+      return isOdd ? "Odd address: usually north/west side" : "Even address: usually south/east side";
+    }
+
+    function facingAdvice(move) {
+      if (latestHeading === null) {
+        return "Start compass for facing check";
+      }
+      const [facing] = gridDirection(latestHeading);
+      if (facing === move) {
+        return `Good: facing ${facing}`;
+      }
+      const opposites = { Uptown: "Downtown", Downtown: "Uptown", East: "West", West: "East" };
+      if (opposites[move] === facing) {
+        return `Turn around: facing ${facing}`;
+      }
+      return `Facing ${facing}: turn ${move.toLowerCase()}`;
+    }
+
+    async function runRideAssist() {
+      const address = $("assistAddress").value.trim();
+      if (!address) {
+        showAssistError("Enter the DoorDash destination address.");
+        return;
+      }
+      if (!latestLocation || typeof latestLocation.latitude !== "number" || typeof latestLocation.longitude !== "number") {
+        showAssistError("Start GPS first and wait for a location fix.");
+        return;
+      }
+
+      try {
+        showAssist("Ride assist", "Checking...", "Getting the destination from Google and comparing it to your current GPS position.", []);
+        await loadGoogleMaps();
+        const geocode = await geocodeAddress(`${address}, Manhattan, New York, NY`);
+        const destination = {
+          lat: geocode.geometry.location.lat(),
+          lng: geocode.geometry.location.lng()
+        };
+        const current = {
+          lat: latestLocation.latitude,
+          lng: latestLocation.longitude
+        };
+        const vector = gridVector(current, destination);
+        const move = primaryMove(vector);
+        const distance = distanceMeters(current, destination);
+        const bearing = bearingDegrees(current, destination);
+        const accuracy = typeof latestLocation.accuracy === "number" ? latestLocation.accuracy : null;
+        const accuracyText = accuracy === null ? "unknown" : `${Math.round(accuracy)} m`;
+        const blocksText = move.blocks < 0.5 ? "less than 1 block" : `about ${Math.round(move.blocks)} block${Math.round(move.blocks) === 1 ? "" : "s"}`;
+        const secondaryText = move.secondaryBlocks < 0.5 ? "little crosstown change" : `then ${move.secondary} about ${Math.round(move.secondaryBlocks)} block${Math.round(move.secondaryBlocks) === 1 ? "" : "s"}`;
+        const headline = move.move;
+        const details = `${facingAdvice(move.move)}. Go ${move.move.toLowerCase()} first (${blocksText}), ${secondaryText}. ${sideHint(address, geocode.formatted_address)} near arrival.`;
+        showAssist("First move", headline, details, [
+          { label: "Destination", value: geocode.formatted_address.replace(", USA", "") },
+          { label: "Distance", value: `${Math.round(distance)} m` },
+          { label: "GPS accuracy", value: accuracyText },
+          { label: "Bearing", value: `${Math.round(bearing)} degrees` }
+        ]);
+      } catch (error) {
+        showAssistError(error.message || "Ride Assist could not run.");
+      }
+    }
+
     $("avenueForm").addEventListener("submit", decodeAvenue);
     $("streetForm").addEventListener("submit", decodeStreet);
     $("avenueTab").addEventListener("click", () => setMode("avenue"));
@@ -1056,6 +1365,9 @@
     $("simulateCompass").addEventListener("click", demoCompass);
     $("startGps").addEventListener("click", startGps);
     $("stopGps").addEventListener("click", stopGps);
+    $("saveApiKey").addEventListener("click", saveApiKey);
+    $("rideAssist").addEventListener("click", runRideAssist);
+    loadSavedApiKey();
   </script>
 </body>
 </html>
